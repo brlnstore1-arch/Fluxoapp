@@ -19,6 +19,12 @@ jobs:
       - name: Extrair projeto
         run: unzip FluxoApp_v2.zip
 
+      - name: Baixar gradle-wrapper.jar
+        run: |
+          mkdir -p FluxoApp2/gradle/wrapper
+          curl -L -o FluxoApp2/gradle/wrapper/gradle-wrapper.jar \
+            https://github.com/gradle/gradle/raw/v7.5.0/gradle/wrapper/gradle-wrapper.jar
+
       - name: Make gradlew executable
         run: chmod +x FluxoApp2/gradlew
 
