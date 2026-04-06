@@ -17,7 +17,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Extrair projeto
-        run: unzip -o FluxoApp_v3.zip
+        run: unzip -o FluxoApp_v1.0.zip
 
       - name: Baixar gradle-wrapper.jar
         run: |
