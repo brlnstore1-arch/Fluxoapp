@@ -1,4 +1,4 @@
-name: Criar FluxoApp
+name: Compilar FluxoApp v1.0
 
 on:
   push:
@@ -8,47 +8,67 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repositório
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Configurar Java 11
+        uses: actions/setup-java@v4
         with:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Extrair projeto
-        run: unzip -o FluxoApp_v1.0.zip
+      - name: Extrair projeto FluxoApp v1.0
+        run: unzip -o FluxoApp_v1.0_Modificado.zip
 
       - name: Baixar gradle-wrapper.jar
         run: |
+          echo "📦 Baixando Gradle Wrapper..."
           curl -sL "https://github.com/gradle/gradle/raw/v7.5.0/gradle/wrapper/gradle-wrapper.jar" \
-            -o FluxoApp2/gradle/wrapper/gradle-wrapper.jar
+            -o FluxoApp_v1.0_Modificado/gradle/wrapper/gradle-wrapper.jar
+          echo "✅ Gradle Wrapper baixado"
 
-      - name: Make gradlew executable
-        run: chmod +x FluxoApp2/gradlew
+      - name: Tornar gradlew executável
+        run: |
+          chmod +x FluxoApp_v1.0_Modificado/gradlew
+          echo "✅ Permissões configuradas"
 
       - name: Verificar keystore
         run: |
-          echo "=== Verificando keystore ==="
+          echo "🔑 Verificando keystore de assinatura..."
           keytool -list \
-            -keystore FluxoApp2/app/fluxoapp-release.keystore \
+            -keystore FluxoApp_v1.0_Modificado/app/fluxoapp-release.keystore \
             -storepass fluxoapp123 -alias fluxoapp 2>/dev/null | grep SHA
-          echo "Keystore OK"
+          echo "✅ Keystore válido"
 
-      - name: Build Release APK
+      - name: Compilar APK Release
         run: |
-          cd FluxoApp2
+          cd FluxoApp_v1.0_Modificado
+          echo "🔨 Compilando FluxoApp v1.0..."
           ./gradlew assembleRelease --stacktrace
+          echo "✅ Compilação concluída"
 
       - name: Verificar assinatura do APK
         run: |
-          echo "=== Certificado do APK gerado ==="
+          echo "🔐 Verificando assinatura do APK..."
           $ANDROID_HOME/build-tools/33.0.0/apksigner verify --print-certs \
-            FluxoApp2/app/build/outputs/apk/release/app-release.apk \
-            2>/dev/null | grep -E "SHA|Signer" || echo "Verificacao OK"
+            FluxoApp_v1.0_Modificado/app/build/outputs/apk/release/app-release.apk \
+            2>/dev/null | grep -E "SHA|Signer" || echo "✅ APK assinado corretamente"
 
-      - name: Upload APK
+      - name: Upload APK como artefato
         uses: actions/upload-artifact@v4
         with:
           name: FluxoApp-release
-          path: FluxoApp2/app/build/outputs/apk/release/app-release.apk
+          path: FluxoApp_v1.0_Modificado/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Informações da build
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "✅ FluxoApp v1.0 compilado com sucesso!"
+          echo "═══════════════════════════════════════"
+          APK_SIZE=$(du -h FluxoApp_v1.0_Modificado/app/build/outputs/apk/release/app-release.apk | cut -f1)
+          echo "📦 Tamanho do APK: $APK_SIZE"
+          echo "🎯 Versão: 1.0 (versionCode 1)"
+          echo "═══════════════════════════════════════"
