@@ -1,74 +1,77 @@
-name: Compilar FluxoApp v1.0
+name: Build APK (Signed)
 
 on:
   push:
-    branches: [ main ]
+    paths:
+      - "FluxoApp_v3.zip"
+
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Checkout repositório
+      - name: 📥 Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar Java 11
+      - name: 📦 Instalar unzip + keytool
+        run: sudo apt-get install -y unzip openjdk-17-jdk
+
+      - name: 📂 Extrair ZIP
+        run: |
+          rm -rf app
+          unzip -o FluxoApp_v3.zip -d app
+
+      - name: 🔢 Gerar versão
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          VERSION="v1.0.0.$COUNT"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Versão: $VERSION"
+
+      - name: ☕ Configurar Java
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Extrair projeto FluxoApp v1.0
-        run: unzip -o FluxoApp_v1.0_Modificado.zip
-
-      - name: Baixar gradle-wrapper.jar
+      - name: 🔍 Encontrar keystore
         run: |
-          echo "📦 Baixando Gradle Wrapper..."
-          curl -sL "https://github.com/gradle/gradle/raw/v7.5.0/gradle/wrapper/gradle-wrapper.jar" \
-            -o FluxoApp_v1.0_Modificado/gradle/wrapper/gradle-wrapper.jar
-          echo "✅ Gradle Wrapper baixado"
+          KEYSTORE_PATH=$(find app -name "*.keystore" -o -name "*.jks" | head -n 1)
+          echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
+          echo "Keystore encontrada em: $KEYSTORE_PATH"
 
-      - name: Tornar gradlew executável
+      - name: 🔑 Verificar keystore
         run: |
-          chmod +x FluxoApp_v1.0_Modificado/gradlew
-          echo "✅ Permissões configuradas"
-
-      - name: Verificar keystore
-        run: |
-          echo "🔑 Verificando keystore de assinatura..."
+          echo "🔑 Verificando keystore..."
           keytool -list \
-            -keystore FluxoApp_v1.0_Modificado/app/fluxoapp-release.keystore \
-            -storepass fluxoapp123 -alias fluxoapp 2>/dev/null | grep SHA
-          echo "✅ Keystore válido"
+            -keystore "$KEYSTORE_PATH" \
+            -storepass fluxoapp123 \
+            -alias fluxoapp | grep SHA
+          echo "✅ Keystore válida"
 
-      - name: Compilar APK Release
+      - name: 🛠️ Permissão Gradle
+        run: chmod +x ./app/FluxoApp2/gradlew
+
+      - name: 🔨 Build RELEASE ASSINADO
+        working-directory: ./app/FluxoApp2
         run: |
-          cd FluxoApp_v1.0_Modificado
-          echo "🔨 Compilando FluxoApp v1.0..."
-          ./gradlew assembleRelease --stacktrace
-          echo "✅ Compilação concluída"
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=$KEYSTORE_PATH \
+            -Pandroid.injected.signing.store.password=fluxoapp123 \
+            -Pandroid.injected.signing.key.alias=fluxoapp \
+            -Pandroid.injected.signing.key.password=fluxoapp123
 
-      - name: Verificar assinatura do APK
+      - name: 📦 Organizar APK
         run: |
-          echo "🔐 Verificando assinatura do APK..."
-          $ANDROID_HOME/build-tools/33.0.0/apksigner verify --print-certs \
-            FluxoApp_v1.0_Modificado/app/build/outputs/apk/release/app-release.apk \
-            2>/dev/null | grep -E "SHA|Signer" || echo "✅ APK assinado corretamente"
+          mkdir output
+          APK_PATH=$(find app -name "*release*.apk" | head -n 1)
+          cp "$APK_PATH" "output/FluxoApp-${VERSION}.apk"
+          echo $VERSION > output/version.txt
 
-      - name: Upload APK como artefato
+      - name: 📤 Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FluxoApp-release
-          path: FluxoApp_v1.0_Modificado/app/build/outputs/apk/release/app-release.apk
-          retention-days: 30
-
-      - name: Informações da build
-        run: |
-          echo "═══════════════════════════════════════"
-          echo "✅ FluxoApp v1.0 compilado com sucesso!"
-          echo "═══════════════════════════════════════"
-          APK_SIZE=$(du -h FluxoApp_v1.0_Modificado/app/build/outputs/apk/release/app-release.apk | cut -f1)
-          echo "📦 Tamanho do APK: $APK_SIZE"
-          echo "🎯 Versão: 1.0 (versionCode 1)"
-          echo "═══════════════════════════════════════"
+          path: output/
