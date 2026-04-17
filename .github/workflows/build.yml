@@ -7,9 +7,7 @@ on:
 
 jobs:
   build:
-    # ⚡ OTIMIZAÇÃO 1: Runner mais potente (4 núcleos)
-    # O padrão 'ubuntu-latest' tem 2 núcleos. Este é mais rápido e ainda gratuito para repositórios públicos.
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +19,6 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      # ⚡ OTIMIZAÇÃO 2: Cache inteligente do Gradle (gerenciado oficialmente)
-      # Isso evita baixar dependências e recompilar código não alterado
-      - name: Setup Gradle (com cache)
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Extrair projeto
         run: unzip -o FluxoApp_v3.zip
 
@@ -36,22 +29,6 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x FluxoApp2/gradlew
-
-      # ⚡ OTIMIZAÇÃO 3: Criar gradle.properties com configurações de aceleração
-      - name: Configurar propriedades do Gradle para build mais rápido
-        run: |
-          cat > FluxoApp2/gradle.properties << 'EOF'
-          # Ativa o cache de build do Gradle (reutiliza resultados anteriores)
-          org.gradle.caching=true
-          # Ativa o cache de configuração (pula análise se nada mudou)
-          org.gradle.configuration-cache=true
-          # Aumenta a memória disponível para o Gradle (acelera o processo)
-          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m
-          # Habilita build paralelo (módulos independentes são compilados ao mesmo tempo)
-          org.gradle.parallel=true
-          EOF
-          echo "gradle.properties criado:"
-          cat FluxoApp2/gradle.properties
 
       - name: Verificar keystore
         run: |
@@ -81,11 +58,10 @@ jobs:
           echo "=== build.gradle atualizado ==="
           grep -E "versionCode|versionName" $GRADLE_FILE
 
-      # ⚡ OTIMIZAÇÃO 4: Build com flag --parallel (redundante com gradle.properties, mas seguro manter)
       - name: Build Release APK
         run: |
           cd FluxoApp2
-          ./gradlew assembleRelease --parallel --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
       - name: Verificar assinatura do APK
         run: |
