@@ -30,36 +30,20 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x FluxoApp2/gradlew
 
-      # ── Keystore: decodifica do secret e grava o arquivo real ─────────────
-      - name: Reconstruir keystore
+      - name: Verificar keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode \
-            > FluxoApp2/app/fluxoapp-release.keystore
-          echo "=== Keystore reconstruído ==="
+          echo "=== Verificando keystore ==="
           keytool -list \
             -keystore FluxoApp2/app/fluxoapp-release.keystore \
-            -storepass "${{ secrets.KEYSTORE_STORE_PASSWORD }}" \
-            -alias    "${{ secrets.KEYSTORE_KEY_ALIAS }}" \
-            2>/dev/null | grep SHA || echo "SHA não disponível — keystore OK"
-
-      # ── Cria local.properties com todos os secrets ────────────────────────
-      - name: Criar local.properties
-        run: |
-          cat > FluxoApp2/local.properties << EOF
-          sdk.dir=$ANDROID_HOME
-          keystore.path=fluxoapp-release.keystore
-          keystore.store_password=${{ secrets.KEYSTORE_STORE_PASSWORD }}
-          keystore.key_alias=${{ secrets.KEYSTORE_KEY_ALIAS }}
-          keystore.key_password=${{ secrets.KEYSTORE_KEY_PASSWORD }}
-          mp.access_token=${{ secrets.MP_ACCESS_TOKEN }}
-          firebase.api_key=${{ secrets.FIREBASE_API_KEY }}
-          EOF
-          echo "=== local.properties criado ==="
+            -storepass fluxoapp123 -alias fluxoapp 2>/dev/null | grep SHA
+          echo "Keystore OK"
 
       - name: Definir versionCode e versionName
         id: versao
         run: |
+          # versionCode = número total de runs neste repositório (começa em 1)
           VERSION_CODE=${{ github.run_number }}
+          # versionName = 1.0.X onde X = run_number
           VERSION_NAME="1.0.${VERSION_CODE}"
           echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_OUTPUT
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
@@ -71,6 +55,7 @@ jobs:
           GRADLE_FILE="FluxoApp2/app/build.gradle"
           VERSION_CODE=${{ steps.versao.outputs.VERSION_CODE }}
           VERSION_NAME=${{ steps.versao.outputs.VERSION_NAME }}
+          # Substituir versionCode e versionName existentes
           sed -i "s/versionCode [0-9]*/versionCode ${VERSION_CODE}/" $GRADLE_FILE
           sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION_NAME}\"/" $GRADLE_FILE
           echo "=== build.gradle atualizado ==="
@@ -86,7 +71,10 @@ jobs:
           echo "=== Certificado do APK gerado ==="
           $ANDROID_HOME/build-tools/33.0.0/apksigner verify --print-certs \
             FluxoApp2/app/build/outputs/apk/release/app-release.apk \
-            2>/dev/null | grep -E "SHA|Signer" || echo "Verificação OK"
+            2>/dev/null | grep -E "SHA|Signer" || \
+          keytool -printcert -jarfile \
+            FluxoApp2/app/build/outputs/apk/release/app-release.apk \
+            2>/dev/null | grep SHA || echo "Verificação manual OK"
 
       - name: Renomear APK com versão
         run: |
